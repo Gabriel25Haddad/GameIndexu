@@ -6,6 +6,7 @@ import { CardSystem } from '../mechanics/CardSystem.js'; //Importa o sistema das
 import { createBattleCharacter } from '../mechanics/DeckCharacters.js'; //Importa os decks de cada personagem
 import { createWorldEnemies, createBattleEnemy } from '../mechanics/Enemies.js'; //Importa inimigos do jogo
 import { Physics } from '../utils/Physics.js'; //Importa o sistema de física
+import { InitialScene } from '../scenes/InitialScene.js';
 
 export class Engine {
     constructor(canvasId) {
@@ -14,12 +15,13 @@ export class Engine {
         this.battleEnemy = null; // Inimigo atual do duelo
         this.canvas = document.getElementById(canvasId); //Busca o canvas no HTML
         this.ctx = this.canvas.getContext('2d'); //Ativa o modo de desenho 2D
+        this.initialScene = new InitialScene(this); //Instancia a cena inicial [cite: 93]
         this.selectionScene = new SelectionScene(this); //Instancia a cena de seleção [cite: 93]
         this.player = null; //O herói começa vazio até a escolha [cite: 6]
         this.input = null; //O teclado liga após a seleção
         this.selectedCharacter = null; //Armazena o herói escolhido [cite: 96]
         this.battleEndTimeout = null; // Timeout usado para voltar à exploração após o fim da batalha
-        this.gameState = 'SELECTION'; //Começa na tela de seleção [cite: 93]
+        this.gameState = 'INITIAL'; //Começa na tela de seleção [cite: 93]
         this.canvas.width = 1280; //Largura do campo de visão
         this.canvas.height = 720; //Altura do campo de visão
         this.lastTime = 0; //Marca o tempo do frame anterior
@@ -64,7 +66,9 @@ export class Engine {
             const mouseX = e.clientX - rect.left; //Calcula X real dentro do jogo
             const mouseY = e.clientY - rect.top; //Calcula Y real dentro do jogo
 
-            if (this.gameState === 'SELECTION') {
+            if (this.gameState === 'INITIAL') {
+                this.initialScene.handleInput(mouseX, mouseY); //Envia o clique para a cena inicial
+            } else if (this.gameState === 'SELECTION') {
                 this.selectionScene.handleInput(mouseX, mouseY); //Envia o clique para a cena [cite: 96]
             } else if (this.gameState === 'BATTLE') {
                 this.handleCardClick(mouseX, mouseY); //Processa clique nas cartas durante batalha
@@ -113,7 +117,9 @@ export class Engine {
 
     update(deltaTime) {
         // Atualiza a lógica do jogo dependendo do estado atual
-        if (this.gameState === 'SELECTION') {
+        if (this.gameState === 'INITIAL') {
+            this.initialScene.update(deltaTime);
+        } else if (this.gameState === 'SELECTION') {
             this.selectionScene.update(deltaTime); //Atualiza lógica da seleção [cite: 93]
         } else if (this.gameState === 'EXPLORATION') {
             if (!this.player) {
@@ -195,6 +201,20 @@ export class Engine {
     }
 
     draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); //Limpa o rastro anterior
+
+        if (this.gameState === 'INITIAL') {
+            this.initialScene.draw(this.ctx);
+        } else if (this.gameState === 'SELECTION') {
+            this.drawSelection();
+        } else if (this.gameState === 'EXPLORATION') {
+            this.drawExploration();
+        } else if (this.gameState === 'BATTLE') {
+            this.combatScene.draw(this.ctx);
+        }
+    }
+
+    drawSelection() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); //Limpa o rastro anterior
 
         if (this.gameState === 'SELECTION') {
