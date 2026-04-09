@@ -1,6 +1,6 @@
 export class ManaManager {
     static characterMana = {
-        'Íris Shadowlace': 24,
+        'Irís Shadowlace': 24,
         'Atom Shadowlace': 12,
         'Ioruh': 12,
         'Toshy': 18,
