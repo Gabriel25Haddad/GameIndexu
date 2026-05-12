@@ -23,6 +23,7 @@ the-void-of-marah/
 │   │   ├── bosses/          # Os 2 chefes de cada fase + Boss Final.
 │   │   ├── keys/            # Chave para desbloquear a próxima fase.
 │   │   └── cutscenes/       # Cenas desenhadas para a transição de fases.
+│   │   └── TitleScreenUI/
 │   │
 │   └── sounds/              # (Opcional, mas recomendado) Músicas e efeitos sonoros.
 │
