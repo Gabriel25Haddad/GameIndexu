@@ -16,6 +16,10 @@ let controleMovimento = {
   timerAndar: 0,
   esperandoEscolha: false,
   dadoAtivo: false,
+  animandoPulo: false,
+  puloProgresso: 0,
+  casaOrigem: null,
+  casaDestino: null,
 };
 
 let stateGlobal = null;
@@ -116,7 +120,8 @@ function renderBoard(ctx, assets, state, mouseX, mouseY) {
   if (
     controleMovimento.passosRestantes === 0 &&
     !controleMovimento.esperandoEscolha &&
-    !controleMovimento.dadoAtivo
+    !controleMovimento.dadoAtivo &&
+    !controleMovimento.animandoPulo
   ) {
     ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
     ctx.fillRect(860, 950, 200, 60);
@@ -130,7 +135,8 @@ function rolarDado() {
   if (
     controleMovimento.passosRestantes > 0 ||
     controleMovimento.esperandoEscolha ||
-    controleMovimento.dadoAtivo
+    controleMovimento.dadoAtivo ||
+    controleMovimento.animandoPulo
   )
     return;
 
@@ -176,6 +182,23 @@ function rolarDado() {
 }
 
 function processarMovimentoBoard(state, mapa) {
+  if (controleMovimento.animandoPulo) {
+    controleMovimento.puloProgresso += 0.05;
+
+    if (controleMovimento.puloProgresso >= 1) {
+      controleMovimento.puloProgresso = 1;
+      controleMovimento.animandoPulo = false;
+      state.casaAtual = controleMovimento.casaDestino;
+      controleMovimento.passosRestantes--;
+
+      if (controleMovimento.passosRestantes === 0) {
+        const novaCasa = mapa.casas.find((c) => c.id === state.casaAtual);
+        aplicarEfeitoDaCasa(novaCasa);
+      }
+    }
+    return;
+  }
+
   if (
     controleMovimento.passosRestantes <= 0 ||
     controleMovimento.esperandoEscolha
@@ -183,7 +206,7 @@ function processarMovimentoBoard(state, mapa) {
     return;
 
   controleMovimento.timerAndar++;
-  if (controleMovimento.timerAndar < 30) return;
+  if (controleMovimento.timerAndar < 10) return;
   controleMovimento.timerAndar = 0;
 
   const casaAtualDados = mapa.casas.find((c) => c.id === state.casaAtual);
@@ -195,13 +218,10 @@ function processarMovimentoBoard(state, mapa) {
   }
 
   if (casaAtualDados.proximas.length === 1) {
-    state.casaAtual = casaAtualDados.proximas[0];
-    controleMovimento.passosRestantes--;
-
-    if (controleMovimento.passosRestantes === 0) {
-      const novaCasa = mapa.casas.find((c) => c.id === state.casaAtual);
-      aplicarEfeitoDaCasa(novaCasa);
-    }
+    controleMovimento.casaOrigem = state.casaAtual;
+    controleMovimento.casaDestino = casaAtualDados.proximas[0];
+    controleMovimento.animandoPulo = true;
+    controleMovimento.puloProgresso = 0;
   } else if (casaAtualDados.proximas.length > 1) {
     controleMovimento.esperandoEscolha = true;
     state.opcoesDeCaminho = casaAtualDados.proximas;
@@ -274,13 +294,34 @@ function desenharBloco(ctx, x, y, corBase, destaque, scale = 1.0) {
 }
 
 function renderPersonagem(ctx, assets, state, mapa) {
-  const casa = mapa.casas.find((c) => c.id === state.casaAtual);
-  if (!casa) return;
-
   const img =
     state.personagemSelecionado === "maya" ? assets.card1 : assets.card2;
-  if (img.complete) {
-    ctx.drawImage(img, casa.x - 55, casa.y - 160, 110, 160);
+  if (!img || !img.complete) return;
+
+  if (controleMovimento.animandoPulo) {
+    const casaOrigem = mapa.casas.find(
+      (c) => c.id === controleMovimento.casaOrigem,
+    );
+    const casaDestino = mapa.casas.find(
+      (c) => c.id === controleMovimento.casaDestino,
+    );
+
+    if (casaOrigem && casaDestino) {
+      const p = controleMovimento.puloProgresso;
+
+      const lerpX = casaOrigem.x + (casaDestino.x - casaOrigem.x) * p;
+      const lerpY = casaOrigem.y + (casaDestino.y - casaOrigem.y) * p;
+
+      const alturaPulo = 80;
+      const arcoY = Math.sin(p * Math.PI) * alturaPulo;
+
+      ctx.drawImage(img, lerpX - 55, lerpY - 160 - arcoY, 110, 160);
+    }
+  } else {
+    const casa = mapa.casas.find((c) => c.id === state.casaAtual);
+    if (casa) {
+      ctx.drawImage(img, casa.x - 55, casa.y - 160, 110, 160);
+    }
   }
 }
 
@@ -322,7 +363,8 @@ window.addEventListener("mousedown", () => {
   if (
     controleMovimento.passosRestantes === 0 &&
     !controleMovimento.esperandoEscolha &&
-    !controleMovimento.dadoAtivo
+    !controleMovimento.dadoAtivo &&
+    !controleMovimento.animandoPulo
   ) {
     if (
       mouseXGlobal >= 860 &&
@@ -342,17 +384,13 @@ window.addEventListener("mousedown", () => {
         const dy = Math.abs(mouseYGlobal - casa.y) / (ALTURA_PISO / 2);
 
         if (dx + dy <= 1) {
-          stateGlobal.casaAtual = casa.id;
-          controleMovimento.passosRestantes--;
+          controleMovimento.casaOrigem = stateGlobal.casaAtual;
+          controleMovimento.casaDestino = casa.id;
+          controleMovimento.animandoPulo = true;
+          controleMovimento.puloProgresso = 0;
+
           controleMovimento.esperandoEscolha = false;
           stateGlobal.opcoesDeCaminho = null;
-
-          if (controleMovimento.passosRestantes === 0) {
-            const novaCasa = MAPA_FLUXO.casas.find(
-              (c) => c.id === stateGlobal.casaAtual,
-            );
-            aplicarEfeitoDaCasa(novaCasa);
-          }
         }
       }
     });
