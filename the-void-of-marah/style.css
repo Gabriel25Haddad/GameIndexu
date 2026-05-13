@@ -1,1 +1,80 @@
-.
+body {
+  margin: 0;
+  background: black;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  object-fit: fill;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#dado-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  perspective: 1000px;
+  pointer-events: none;
+}
+
+.dado {
+  width: 100px;
+  height: 100px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 1.5s ease-out;
+}
+
+.face {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 4px solid #333;
+  border-radius: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 50px;
+  font-weight: bold;
+  font-family: sans-serif;
+  color: #333;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.frente {
+  transform: rotateY(0deg) translateZ(50px);
+}
+.tras {
+  transform: rotateY(180deg) translateZ(50px);
+}
+.direita {
+  transform: rotateY(90deg) translateZ(50px);
+}
+.esquerda {
+  transform: rotateY(-90deg) translateZ(50px);
+}
+.topo {
+  transform: rotateX(90deg) translateZ(50px);
+}
+.baixo {
+  transform: rotateX(-90deg) translateZ(50px);
+}
+
+@keyframes girando {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(1080deg) rotateY(1080deg) rotateZ(360deg);
+  }
+}
+
+.rolando {
+  animation: girando 0.5s linear infinite;
+}

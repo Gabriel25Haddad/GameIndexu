@@ -1,1 +1,360 @@
-.
+const LARGURA_PISO = 110;
+const ALTURA_PISO = 60;
+const ESPESSURA = 15;
+
+const CASAS = {
+  NORMAL: { cor: "#ffffff" },
+  GACHA: { cor: "#ffcc00" },
+  RECOVERY: { cor: "#00ff88" },
+  COMBAT: { cor: "#ff4444" },
+  CHECKPOINT: { cor: "#4444ff" },
+  BOSS: { cor: "#9900ff" },
+};
+
+let controleMovimento = {
+  passosRestantes: 0,
+  timerAndar: 0,
+  esperandoEscolha: false,
+  dadoAtivo: false,
+};
+
+let stateGlobal = null;
+let mouseXGlobal = 0;
+let mouseYGlobal = 0;
+
+function gerarMalhaOrganica() {
+  const layoutGrid = [
+    [0],
+    [-1, 1],
+    [-2, 2],
+    [-3, -1, 1, 3],
+    [-4, 0, 4],
+    [-3, -1, 1, 3],
+    [-4, -2, 2, 4],
+    [-3, 1, 3],
+    [-2, 0, 2],
+    [-3, -1, 1, 3],
+    [-4, 0, 4],
+    [-3, -1, 3],
+    [-2, 2],
+    [-1, 1],
+    [0],
+  ];
+
+  let casas = [];
+  let idCounter = 0;
+
+  for (let c = 0; c < layoutGrid.length; c++) {
+    for (let i = 0; i < layoutGrid[c].length; i++) {
+      let r = layoutGrid[c][i];
+
+      let x = 150 + c * 115;
+      let y = 540 + r * 55;
+
+      let tipo = CASAS.NORMAL;
+      if (c === 0) tipo = CASAS.CHECKPOINT;
+      else if (c === 14) tipo = CASAS.BOSS;
+      else if (c === 8 && r === 0) tipo = CASAS.RECOVERY;
+      else if (idCounter % 9 === 0) tipo = CASAS.GACHA;
+      else if (idCounter % 6 === 0) tipo = CASAS.COMBAT;
+      else if (idCounter % 13 === 0) tipo = CASAS.RECOVERY;
+
+      casas.push({ id: idCounter, c, r, x, y, tipo, proximas: [] });
+      idCounter++;
+    }
+  }
+
+  casas.forEach((casa) => {
+    let casasNaProximaColuna = casas.filter((n) => n.c === casa.c + 1);
+    casasNaProximaColuna.forEach((proxima) => {
+      if (proxima.r === casa.r - 1 || proxima.r === casa.r + 1) {
+        casa.proximas.push(proxima.id);
+      }
+    });
+  });
+
+  return casas;
+}
+
+const MAPA_FLUXO = {
+  nome: "The Void - Ruínas Flutuantes",
+  casas: gerarMalhaOrganica(),
+};
+
+function renderBoard(ctx, assets, state, mouseX, mouseY) {
+  stateGlobal = state;
+  mouseXGlobal = mouseX;
+  mouseYGlobal = mouseY;
+
+  if (assets.fundoBoard && assets.fundoBoard.complete) {
+    ctx.drawImage(assets.fundoBoard, 0, 0, 1920, 1080);
+  }
+
+  desenharConexoes(ctx, MAPA_FLUXO);
+
+  processarMovimentoBoard(state, MAPA_FLUXO);
+
+  MAPA_FLUXO.casas.forEach((casa) => {
+    const ehOpcao = state.opcoesDeCaminho?.includes(casa.id);
+    const dx = Math.abs(mouseX - casa.x) / (LARGURA_PISO / 2);
+    const dy = Math.abs(mouseY - casa.y) / (ALTURA_PISO / 2);
+    const isHover = dx + dy <= 1;
+
+    let corFinal = casa.tipo.cor;
+    if (ehOpcao) corFinal = isHover ? "#ffffff" : "#aaaaaa";
+
+    let scale = 1.0;
+    if (casa.c === 14) scale = 1.3;
+    if (casa.c === 8 && casa.r === 0) scale = 1.2;
+
+    desenharBloco(ctx, casa.x, casa.y, corFinal, ehOpcao || isHover, scale);
+  });
+
+  renderPersonagem(ctx, assets, state, MAPA_FLUXO);
+  renderHUD(ctx, state);
+
+  if (
+    controleMovimento.passosRestantes === 0 &&
+    !controleMovimento.esperandoEscolha &&
+    !controleMovimento.dadoAtivo
+  ) {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillRect(860, 950, 200, 60);
+    ctx.fillStyle = "black";
+    ctx.font = "bold 24px Arial";
+    ctx.fillText("ROLAR DADO", 875, 990);
+  }
+}
+
+function rolarDado() {
+  if (
+    controleMovimento.passosRestantes > 0 ||
+    controleMovimento.esperandoEscolha ||
+    controleMovimento.dadoAtivo
+  )
+    return;
+
+  controleMovimento.dadoAtivo = true;
+  const container = document.getElementById("dado-container");
+  const dado = document.getElementById("dado");
+
+  container.style.display = "block";
+  dado.classList.add("rolando");
+
+  const resultado = Math.floor(Math.random() * 6) + 1;
+
+  setTimeout(() => {
+    dado.classList.remove("rolando");
+
+    switch (resultado) {
+      case 1:
+        dado.style.transform = "rotateY(0deg)";
+        break;
+      case 6:
+        dado.style.transform = "rotateY(180deg)";
+        break;
+      case 3:
+        dado.style.transform = "rotateY(-90deg)";
+        break;
+      case 4:
+        dado.style.transform = "rotateY(90deg)";
+        break;
+      case 2:
+        dado.style.transform = "rotateX(-90deg)";
+        break;
+      case 5:
+        dado.style.transform = "rotateX(90deg)";
+        break;
+    }
+
+    setTimeout(() => {
+      container.style.display = "none";
+      controleMovimento.passosRestantes = resultado;
+      controleMovimento.dadoAtivo = false;
+    }, 1000);
+  }, 1500);
+}
+
+function processarMovimentoBoard(state, mapa) {
+  if (
+    controleMovimento.passosRestantes <= 0 ||
+    controleMovimento.esperandoEscolha
+  )
+    return;
+
+  controleMovimento.timerAndar++;
+  if (controleMovimento.timerAndar < 30) return;
+  controleMovimento.timerAndar = 0;
+
+  const casaAtualDados = mapa.casas.find((c) => c.id === state.casaAtual);
+
+  if (casaAtualDados.proximas.length === 0) {
+    controleMovimento.passosRestantes = 0;
+    aplicarEfeitoDaCasa(casaAtualDados);
+    return;
+  }
+
+  if (casaAtualDados.proximas.length === 1) {
+    state.casaAtual = casaAtualDados.proximas[0];
+    controleMovimento.passosRestantes--;
+
+    if (controleMovimento.passosRestantes === 0) {
+      const novaCasa = mapa.casas.find((c) => c.id === state.casaAtual);
+      aplicarEfeitoDaCasa(novaCasa);
+    }
+  } else if (casaAtualDados.proximas.length > 1) {
+    controleMovimento.esperandoEscolha = true;
+    state.opcoesDeCaminho = casaAtualDados.proximas;
+  }
+}
+
+function aplicarEfeitoDaCasa(casa) {
+  if (casa.tipo === CASAS.GACHA) {
+  } else if (casa.tipo === CASAS.COMBAT) {
+  } else if (casa.tipo === CASAS.RECOVERY) {
+  }
+}
+
+function desenharConexoes(ctx, mapa) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.lineWidth = 5;
+  ctx.setLineDash([10, 10]);
+
+  mapa.casas.forEach((casa) => {
+    casa.proximas.forEach((proximaId) => {
+      const destino = mapa.casas.find((c) => c.id === proximaId);
+      if (destino) {
+        ctx.beginPath();
+        ctx.moveTo(casa.x, casa.y);
+        ctx.lineTo(destino.x, destino.y);
+        ctx.stroke();
+      }
+    });
+  });
+  ctx.restore();
+}
+
+function desenharBloco(ctx, x, y, corBase, destaque, scale = 1.0) {
+  const w = LARGURA_PISO * scale;
+  const h = ALTURA_PISO * scale;
+  const esp = ESPESSURA * scale;
+
+  ctx.save();
+  ctx.lineJoin = "round";
+
+  ctx.fillStyle = escurecerCor(corBase, 50);
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2, y);
+  ctx.lineTo(x, y + h / 2);
+  ctx.lineTo(x + w / 2, y);
+  ctx.lineTo(x + w / 2, y + esp);
+  ctx.lineTo(x, y + h / 2 + esp);
+  ctx.lineTo(x - w / 2, y + esp);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = corBase;
+  if (destaque) {
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "white";
+  }
+  ctx.beginPath();
+  ctx.moveTo(x, y - h / 2);
+  ctx.lineTo(x + w / 2, y);
+  ctx.lineTo(x, y + h / 2);
+  ctx.lineTo(x - w / 2, y);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function renderPersonagem(ctx, assets, state, mapa) {
+  const casa = mapa.casas.find((c) => c.id === state.casaAtual);
+  if (!casa) return;
+
+  const img =
+    state.personagemSelecionado === "maya" ? assets.card1 : assets.card2;
+  if (img.complete) {
+    ctx.drawImage(img, casa.x - 55, casa.y - 160, 110, 160);
+  }
+}
+
+function renderHUD(ctx, state) {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+  ctx.fillRect(50, 880, 480, 150);
+  ctx.fillStyle = "white";
+  ctx.font = "bold 32px sans-serif";
+  ctx.fillText(state.personagemSelecionado?.toUpperCase() || "", 80, 930);
+
+  ctx.font = "22px sans-serif";
+  ctx.fillStyle = "#ff5555";
+  ctx.fillText(`VIDA: ${state.stats.vida}/${state.stats.vidaMax}`, 80, 980);
+  ctx.fillStyle = "#55ccff";
+  ctx.fillText(`DEFESA: ${state.stats.defesa}`, 300, 980);
+}
+
+function escurecerCor(hex, amt) {
+  let num = parseInt(hex.slice(1), 16),
+    r = (num >> 16) - amt,
+    g = ((num >> 8) & 0x00ff) - amt,
+    b = (num & 0x0000ff) - amt;
+  return (
+    "#" +
+    (
+      0x1000000 +
+      (r < 0 ? 0 : r) * 0x10000 +
+      (g < 0 ? 0 : g) * 0x100 +
+      (b < 0 ? 0 : b)
+    )
+      .toString(16)
+      .slice(1)
+  );
+}
+
+window.addEventListener("mousedown", () => {
+  if (!stateGlobal || stateGlobal.cena !== "jogo") return;
+
+  if (
+    controleMovimento.passosRestantes === 0 &&
+    !controleMovimento.esperandoEscolha &&
+    !controleMovimento.dadoAtivo
+  ) {
+    if (
+      mouseXGlobal >= 860 &&
+      mouseXGlobal <= 1060 &&
+      mouseYGlobal >= 950 &&
+      mouseYGlobal <= 1010
+    ) {
+      rolarDado();
+      return;
+    }
+  }
+
+  if (controleMovimento.esperandoEscolha && stateGlobal.opcoesDeCaminho) {
+    MAPA_FLUXO.casas.forEach((casa) => {
+      if (stateGlobal.opcoesDeCaminho.includes(casa.id)) {
+        const dx = Math.abs(mouseXGlobal - casa.x) / (LARGURA_PISO / 2);
+        const dy = Math.abs(mouseYGlobal - casa.y) / (ALTURA_PISO / 2);
+
+        if (dx + dy <= 1) {
+          stateGlobal.casaAtual = casa.id;
+          controleMovimento.passosRestantes--;
+          controleMovimento.esperandoEscolha = false;
+          stateGlobal.opcoesDeCaminho = null;
+
+          if (controleMovimento.passosRestantes === 0) {
+            const novaCasa = MAPA_FLUXO.casas.find(
+              (c) => c.id === stateGlobal.casaAtual,
+            );
+            aplicarEfeitoDaCasa(novaCasa);
+          }
+        }
+      }
+    });
+  }
+});

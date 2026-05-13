@@ -3,29 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <title>The Void of Marah</title>
-    <style>
-      body {
-        margin: 0;
-        background: black;
-        overflow: hidden;
-      }
-      canvas {
-        display: block;
-        width: 100vw;
-        height: 100vh;
-        object-fit: fill;
-        /* Mantém a Pixel Art nítida */
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
-      }
-    </style>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <canvas id="gameCanvas"></canvas>
+
+    <div id="dado-container" style="display: none">
+      <div id="dado" class="dado">
+        <div class="face frente">1</div>
+        <div class="face tras">6</div>
+        <div class="face direita">3</div>
+        <div class="face esquerda">4</div>
+        <div class="face topo">2</div>
+        <div class="face baixo">5</div>
+      </div>
+    </div>
+
     <!-- Scripts do Jogo -->
     <script src="js/scenes/menu.js"></script>
     <script src="js/scenes/selecao.js"></script>
     <script src="js/scenes/creditos.js"></script>
+    <script src="js/scenes/board.js"></script>
     <script src="js/main.js"></script>
   </body>
 </html>

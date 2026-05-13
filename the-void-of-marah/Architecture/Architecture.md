@@ -47,5 +47,4 @@ the-void-of-marah/
 │
 └── mechanics/           # Sistemas independentes
 ├── gachaSystem.js   # Calcula se a casa caiu em par (coisa boa) ou ímpar (coisa ruim).
-├── roulette.js      # A lógica da geração de tabuleiro.
 └── turnManager.js   # Controla de quem é a vez no combate e o uso das cartas.
